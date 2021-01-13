@@ -32,11 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define TIM_IT_Update              ((uint16_t)0x0001)
-#define DMA_FLAG_TCIF6                    ((uint32_t)0x20200000)
-#define USART_FLAG_TC                        ((uint16_t)0x0040)
-#define HIGH_ISR_MASK           (uint32_t)0x20000000
-#define RESERVED_MASK           (uint32_t)0x0F7D0F7D
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,7 +73,7 @@ __IO uint8_t coll_mode = 0;
 
 int apb1_freq;
 int start_flag = 0;
-void get_Timer_clocks(void);
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,9 +92,8 @@ static void MX_NVIC_Init(void);
 
 void flush_CCD(void);
 void sort_aRxBuffer();
-void UART2_Tx_DMA(UART_HandleTypeDef *huart);
-FlagStatus DMA_GetFlagStatus(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_FLAG);
-void DMA_ClearFlag(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_FLAG);
+void get_Timer_clocks(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -154,7 +149,6 @@ int main(void)
 
   	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-	//HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 	HAL_TIM_PWM_Start_IT(&htim5, TIM_CHANNEL_1);
 
@@ -194,13 +188,9 @@ int main(void)
 	aRxBuffer[11] = 1;
 
 	HAL_UART_Receive_DMA(&huart2, aRxBuffer, RxDataSize*sizeof(uint8_t));
-//	HAL_UART_Transmit_DMA(&huart2, aRxBuffer, RxDataSize);
 
 	GPIOA->ODR ^= GPIO_PIN_5;
-	//flush_CCD();
 
-	//ADC1->CR2 |= (uint32_t)ADC_CR2_DDS;
-	//HAL_ADC_Start_DMA(&hadc1, aTxBuffer, CCDSize*sizeof(uint16_t));
   while (1)
   {
 
@@ -220,15 +210,11 @@ int main(void)
 		SH_period = nRxBuffer[2]<<24|nRxBuffer[3]<<16|nRxBuffer[4]<<8|nRxBuffer[5];
 
 		/*	Disable ICG (TIM5) and SH (TIM2) before reconfiguring*/
-		//TIM_Cmd(TIM2, DISABLE);
-		//TIM_Cmd(TIM5, DISABLE);
-		//HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Stop_IT(&htim5, TIM_CHANNEL_1);
 
 		/* 	Reconfigure TIM2 and TIM5 */
 		MX_TIM1_Init();
-		//MX_TIM2_Init();
 		MX_TIM5_Init();
 
 		//HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
@@ -249,7 +235,6 @@ int main(void)
 			pulse_counter=6;
 
 		/* Transmit data in aTxBuffer */
-		//UART2_Tx_DMA();
 		HAL_UART_Transmit_DMA(&huart2, aTxBuffer, CCDSize*sizeof(uint16_t));
 		break;
 
@@ -291,7 +276,6 @@ int main(void)
 		}
 
 		/* Transmit data in aTxBuffer */
-		//UART2_Tx_DMA();
 		HAL_UART_Transmit_DMA(&huart2, aTxBuffer, CCDSize*sizeof(uint16_t));
 		break;
 	}
@@ -796,10 +780,7 @@ void flush_CCD(void)
 	SH_period = 20;
 
 	/*	Disable ICG (TIM5) and SH (TIM2) before reconfiguring*/
-//	TIM_Cmd(TIM2, DISABLE);
-//	TIM_Cmd(TIM5, DISABLE);
 	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
-	//HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Stop(&htim5, TIM_CHANNEL_1);
 
 	/*	Reset flags and counters */
@@ -807,21 +788,12 @@ void flush_CCD(void)
 	pulse_counter = 0;
 
 	/* 	Reconfigure TIM2 and TIM5 */
-//	TIM_ICG_SH_conf();
-
 	MX_TIM1_Init();
-	//MX_TIM2_Init();
 	MX_TIM5_Init();
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-	//HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start_IT(&htim5, TIM_CHANNEL_1);
 
-  /*	Set counters close to expiration, as the integration times may be very long.
-	(For example: with an ICG-period of 300s we'd have to wait 600s for two ICG-
-	pulses if we don't cut the first one short.)
-	The SH-period is slightly delayed to comply with the CCD's timing requirements. */
-	//TIM2->CNT = SH_period - SH_delay;// + (SH_period % 2);
-	TIM1->CNT = SH_period - SH_delay;// + (SH_period % 2);
+	TIM1->CNT = SH_period - SH_delay;
 	TIM5->CNT = ICG_period - ICG_delay;
 	TIM3->CNT = fm_delay;
 
@@ -862,7 +834,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	if (start_flag == 0) {
 		if (HAL_ADC_Start_DMA(&hadc1, aTxBuffer, CCDSize*sizeof(uint16_t)) == HAL_OK) {
 			GPIOA->ODR ^= GPIO_PIN_5;
-			//HAL_UART_Transmit_DMA(&huart2, aRxBuffer, RxDataSize*sizeof(uint8_t));
 		}
 	}
 	//HAL_UART_Transmit_DMA(&huart2, aTxBuffer, 2*CCDSize);

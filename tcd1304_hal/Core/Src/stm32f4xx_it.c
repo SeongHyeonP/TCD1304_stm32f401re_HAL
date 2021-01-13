@@ -32,14 +32,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TIM_IT_Update              ((uint16_t)0x0001)
-#define TRANSFER_IT_MASK        (uint32_t)0x0F3C0F3C
-#define HIGH_ISR_MASK           (uint32_t)0x20000000
-#define RESERVED_MASK           (uint32_t)0x0F7D0F7D
-#define DMA_IT_TCIF5            ((uint32_t)0x20008800)
-#define DMA_IT_TCIF0            ((uint32_t)0x10008020)
-#define TRANSFER_IT_ENABLE_MASK (uint32_t)(DMA_SxCR_TCIE | DMA_SxCR_HTIE | \
-                                           DMA_SxCR_TEIE | DMA_SxCR_DMEIE)
 
 /* USER CODE END PD */
 
@@ -55,12 +47,6 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-
-ITStatus TIM_GetITStatus(TIM_TypeDef* TIMx, uint16_t TIM_IT);
-void TIM_ClearITPendingBit(TIM_TypeDef* TIMx, uint16_t TIM_IT);
-ITStatus DMA_GetITStatus(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT);
-void DMA_ClearITPendingBit(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT);
-void sort_aRxBuffer(void);
 
 /* USER CODE END PFP */
 
@@ -92,8 +78,6 @@ extern __IO uint8_t CCD_flushed;
 extern __IO uint8_t avg_exps;
 extern __IO uint8_t exps_left;
 extern __IO uint8_t coll_mode;
-
-int dd = 0;
 
 /* USER CODE END EV */
 
@@ -284,8 +268,6 @@ void TIM5_IRQHandler(void)
 	if (pulse_counter == 6)
 	{
 		/* Restart TIM4 as this gets the ADC running again */
-		//TIM4->CR1 |= TIM_CR1_CEN;
-		//GPIOA->ODR ^= GPIO_Pin_5;
 		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 		HAL_ADC_Start_DMA(&hadc1, aTxBuffer, CCDSize*sizeof(uint16_t));
 	}
@@ -317,50 +299,49 @@ void DMA2_Stream0_IRQHandler(void)
   /* USER CODE BEGIN DMA2_Stream0_IRQn 0 */
 
 	/* Stop TIM4 and thus the ADC */
-			//TIM4->CR1 &= (uint16_t)~TIM_CR1_CEN;
-			HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
-			HAL_ADC_Stop_DMA(&hadc1);
+	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
+	HAL_ADC_Stop_DMA(&hadc1);
 
-			/* Keep track of the number of integrations performed */
-			/* Are we collecting just once? */
-			if (avg_exps == 1)
-			{
-				/* Set the data_flag to transmit */
-				data_flag = 1;
-			}
-			else if (avg_exps > 1)
-			{
-				/* Is this the first collection of several? */
-				if (exps_left == avg_exps)
-				{
-	//				exps_left--;
-					/* Set the pulse counter to 6 to start the ADC again
-					   at next ICG-pulse. */
-					pulse_counter = 6;
-					/* Set the data_flag to overwrite avgBuffer */
-					data_flag = 2;
-				}
+	/* Keep track of the number of integrations performed */
+	/* Are we collecting just once? */
+	if (avg_exps == 1)
+	{
+		/* Set the data_flag to transmit */
+		data_flag = 1;
+	}
+	else if (avg_exps > 1)
+	{
+		/* Is this the first collection of several? */
+		if (exps_left == avg_exps)
+		{
+//				exps_left--;
+			/* Set the pulse counter to 6 to start the ADC again
+			   at next ICG-pulse. */
+			pulse_counter = 6;
+			/* Set the data_flag to overwrite avgBuffer */
+			data_flag = 2;
+		}
 
-				/* Is this a collection in the middle? */
-				else if ((exps_left < avg_exps)&&(exps_left > 1))
-				{
-	//				exps_left--;
-					/* Set the pulse counter to 6 to start the ADC again
-					   at next ICG-pulse. */
-					pulse_counter = 6;
-					/* Set the data_flag to sum integrations */
-					data_flag = 3;
-				}
+		/* Is this a collection in the middle? */
+		else if ((exps_left < avg_exps)&&(exps_left > 1))
+		{
+//				exps_left--;
+			/* Set the pulse counter to 6 to start the ADC again
+			   at next ICG-pulse. */
+			pulse_counter = 6;
+			/* Set the data_flag to sum integrations */
+			data_flag = 3;
+		}
 
-				/* Is this the last collection of several? */
-				else if (exps_left == 1)
-				{
-	//				exps_left--;
-					/* Set the data_flag to average integrations and tx */
-					data_flag = 4;
-				}
-				exps_left--;
-			}
+		/* Is this the last collection of several? */
+		else if (exps_left == 1)
+		{
+//				exps_left--;
+			/* Set the data_flag to average integrations and tx */
+			data_flag = 4;
+		}
+		exps_left--;
+	}
 
   /* USER CODE END DMA2_Stream0_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc1);
@@ -370,138 +351,6 @@ void DMA2_Stream0_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
-ITStatus TIM_GetITStatus(TIM_TypeDef* TIMx, uint16_t TIM_IT)
-{
-  ITStatus bitstatus = RESET;
-  uint16_t itstatus = 0x0, itenable = 0x0;
-  /* Check the parameters */
-  assert_param(IS_TIM_ALL_PERIPH(TIMx));
-  assert_param(IS_TIM_GET_IT(TIM_IT));
-
-  itstatus = TIMx->SR & TIM_IT;
-
-  itenable = TIMx->DIER & TIM_IT;
-  if ((itstatus != (uint16_t)RESET) && (itenable != (uint16_t)RESET))
-  {
-    bitstatus = SET;
-  }
-  else
-  {
-    bitstatus = RESET;
-  }
-  return bitstatus;
-}
-
-void TIM_ClearITPendingBit(TIM_TypeDef* TIMx, uint16_t TIM_IT)
-{
-  /* Check the parameters */
- // assert_param(IS_TIM_ALL_PERIPH(TIMx));
-
-  /* Clear the IT pending Bit */
-  TIMx->SR = (uint16_t)~TIM_IT;
-}
-
-ITStatus DMA_GetITStatus(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT)
-{
-  ITStatus bitstatus = RESET;
-  DMA_TypeDef* DMAy;
-  uint32_t tmpreg = 0, enablestatus = 0;
-
-  /* Check the parameters */
-  //assert_param(IS_DMA_ALL_PERIPH(DMAy_Streamx));
-  //assert_param(IS_DMA_GET_IT(DMA_IT));
-
-  /* Determine the DMA to which belongs the stream */
-  if (DMAy_Streamx < DMA2_Stream0)
-  {
-    /* DMAy_Streamx belongs to DMA1 */
-    DMAy = DMA1;
-  }
-  else
-  {
-    /* DMAy_Streamx belongs to DMA2 */
-    DMAy = DMA2;
-  }
-
-  /* Check if the interrupt enable bit is in the CR or FCR register */
-  if ((DMA_IT & TRANSFER_IT_MASK) != (uint32_t)RESET)
-  {
-    /* Get the interrupt enable position mask in CR register */
-    tmpreg = (uint32_t)((DMA_IT >> 11) & TRANSFER_IT_ENABLE_MASK);
-
-    /* Check the enable bit in CR register */
-    enablestatus = (uint32_t)(DMAy_Streamx->CR & tmpreg);
-  }
-  else
-  {
-    /* Check the enable bit in FCR register */
-    enablestatus = (uint32_t)(DMAy_Streamx->FCR & DMA_IT_FE);
-  }
-
-  /* Check if the interrupt pending flag is in LISR or HISR */
-  if ((DMA_IT & HIGH_ISR_MASK) != (uint32_t)RESET)
-  {
-    /* Get DMAy HISR register value */
-    tmpreg = DMAy->HISR ;
-  }
-  else
-  {
-    /* Get DMAy LISR register value */
-    tmpreg = DMAy->LISR ;
-  }
-
-  /* mask all reserved bits */
-  tmpreg &= (uint32_t)RESERVED_MASK;
-
-  /* Check the status of the specified DMA interrupt */
-  if (((tmpreg & DMA_IT) != (uint32_t)RESET) && (enablestatus != (uint32_t)RESET))
-  {
-    /* DMA_IT is set */
-    bitstatus = SET;
-  }
-  else
-  {
-    /* DMA_IT is reset */
-    bitstatus = RESET;
-  }
-
-  /* Return the DMA_IT status */
-  return  bitstatus;
-}
-
-void DMA_ClearITPendingBit(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT)
-{
-  DMA_TypeDef* DMAy;
-
-  /* Check the parameters */
- // assert_param(IS_DMA_ALL_PERIPH(DMAy_Streamx));
- // assert_param(IS_DMA_CLEAR_IT(DMA_IT));
-
-  /* Determine the DMA to which belongs the stream */
-  if (DMAy_Streamx < DMA2_Stream0)
-  {
-    /* DMAy_Streamx belongs to DMA1 */
-    DMAy = DMA1;
-  }
-  else
-  {
-    /* DMAy_Streamx belongs to DMA2 */
-    DMAy = DMA2;
-  }
-
-  /* Check if LIFCR or HIFCR register is targeted */
-  if ((DMA_IT & HIGH_ISR_MASK) != (uint32_t)RESET)
-  {
-    /* Set DMAy HIFCR register clear interrupt bits */
-    DMAy->HIFCR = (uint32_t)(DMA_IT & RESERVED_MASK);
-  }
-  else
-  {
-    /* Set DMAy LIFCR register clear interrupt bits */
-    DMAy->LIFCR = (uint32_t)(DMA_IT & RESERVED_MASK);
-  }
-}
 
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
