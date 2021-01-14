@@ -1,4 +1,4 @@
-TCD1304_stm32f401re_HAL
+TCD1304_stm32f401re_HAL : SPL library -> stm32cubeIDE 환경 사용 가능하도록 변환 작업, HAL library 사용
 
 orginal code and hardware setting : using SPL, stm32f401re nucleo board, tcd1304
 https://tcd1304.wordpress.com/ 참고해 동일하게 세팅
