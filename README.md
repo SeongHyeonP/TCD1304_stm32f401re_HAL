@@ -3,7 +3,7 @@ TCD1304_stm32f401re_HAL : SPL library -> stm32cubeIDE 환경 사용 가능하도
 orginal code and hardware setting : using SPL, stm32f401re nucleo board, tcd1304
 https://tcd1304.wordpress.com/ 참고해 동일하게 세팅
 
-#기존 코드랑 다른 점
+<기존 코드랑 다른 점>
 1. using stm32cubeIDE and HAL library
 2. TIM2 ch2 -> TIM1 ch2 (SH) : 작동이 안해서 오실로스코프로 보니 tim2가 제대로 작동이 되지않아 tim1을 사용해보니 작동했다.
 
